@@ -16,6 +16,58 @@ google_sheet_csv_url <- "https://docs.google.com/spreadsheets/d/e/2PACX-1vRxW5Rj
 # Try different methods to read the data
 df_combined <- NULL
 
+# Helpers to detect and normalize access column from any source
+get_access_col_name <- function(df) {
+  nms <- names(df)
+  if (length(nms) == 0) return(NA_character_)
+  nms_norm <- tolower(gsub("[^A-Za-z0-9_]", "_", nms))
+  nms_norm <- gsub("_+", "_", nms_norm)
+  nms_norm <- gsub("^_|_$", "", nms_norm)
+
+  # Preferred explicit names first
+  preferred <- c("access", "access_only_link", "access_only", "acces_only_link", "acces_only", "access_link")
+  for (p in preferred) {
+    idx <- which(nms_norm == p)
+    if (length(idx) > 0) return(nms[idx[1]])
+  }
+
+  # Fallback: any column hinting access + link
+  idx <- which(grepl("access", nms_norm) & grepl("link", nms_norm))
+  if (length(idx) > 0) return(nms[idx[1]])
+
+  # Last resort: any access-like column
+  idx <- which(grepl("^access", nms_norm))
+  if (length(idx) > 0) return(nms[idx[1]])
+
+  NA_character_
+}
+
+has_nonempty_access <- function(df) {
+  col_name <- get_access_col_name(df)
+  if (is.na(col_name)) return(FALSE)
+  vals <- trimws(as.character(df[[col_name]]))
+  vals <- vals[!is.na(vals)]
+  any(nzchar(vals))
+}
+
+normalize_access_column <- function(df) {
+  col_name <- get_access_col_name(df)
+  if (is.na(col_name)) return(df)
+
+  if (col_name != "access") {
+    if ("access" %in% names(df)) {
+      new_access <- trimws(as.character(df[[col_name]]))
+      old_access <- trimws(as.character(df$access))
+      df$access <- ifelse(nzchar(new_access), new_access, old_access)
+      df[[col_name]] <- NULL
+    } else {
+      names(df)[names(df) == col_name] <- "access"
+    }
+  }
+
+  df
+}
+
 # CSV export (most reliable): default published sheet from the workbook
 cat("Attempting to read from CSV export (published default sheet)...\n")
 tryCatch({
@@ -23,6 +75,11 @@ tryCatch({
   cat("Successfully read", nrow(df_combined), "rows and", ncol(df_combined),
       "columns from:", google_sheet_csv_url, "\n")
   cat("Columns read:", names(df_combined), "\n")
+
+  if (!has_nonempty_access(df_combined)) {
+    cat("Default published CSV has no non-empty access values; trying next source...\n")
+    df_combined <- NULL
+  }
 }, error = function(e) {
   cat("Default published CSV failed:", e$message, "\n")
 })
@@ -39,6 +96,11 @@ if (is.null(df_combined)) {
     cat("Successfully read", nrow(df_combined), "rows and", ncol(df_combined),
         "columns from TEST sheet CSV\n")
     cat("Columns read:", names(df_combined), "\n")
+
+    if (!has_nonempty_access(df_combined)) {
+      cat("TEST sheet CSV has no non-empty access values; trying API source...\n")
+      df_combined <- NULL
+    }
   }, error = function(e) {
     cat("TEST sheet CSV failed:", e$message, "\n")
   })
@@ -89,6 +151,9 @@ if ("access_only_link" %in% names(df_combined)) {
     df_combined$access_only_link <- NULL
   }
 }
+
+# Additional guard for slight header variations (e.g., accessonlylink, access_link)
+df_combined <- normalize_access_column(df_combined)
 
 # Clean and prepare the data
 Portal <- df_combined
