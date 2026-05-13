@@ -11,21 +11,21 @@ library(stringr)
 google_sheet_url_ne <- "https://docs.google.com/spreadsheets/d/1GCInWJYzSmFEob4lKhdtFW6nnoGf_p5lWajdTE285v4/edit"
 sheets_ne <- sheet_names(google_sheet_url_ne)
 df_ne <- read_sheet(google_sheet_url_ne, sheet = sheets_ne, col_types = "c")
-df_ne_anonymous <- df_ne %>% select(2:27, `Entry ID`)  # Anonimize
+df_ne_anonymous <- df_ne %>% select(2:28, `Entry ID`)  # Anonimize
 #df_ne_anonymous <- df_ne_anonymous %>% mutate('Entry ID' = sprintf("ENTN_%03d", row_number()))
 
 # Read in data from New Additions form
 google_sheet_url_a <- "https://docs.google.com/spreadsheets/d/1nK_OBmuI7LtbpaHBmdWEbmbNMgQCpRDDtz3S10M4gVw/edit"
 sheets_a <- sheet_names(google_sheet_url_a)
 df_a <- read_sheet(google_sheet_url_a, sheet = sheets_a, col_types = "c")
-df_a_anonymous <- df_a %>% select(2:25, `Entry ID`) # Anonimize
+df_a_anonymous <- df_a %>% select(2:26, `Entry ID`) # Anonimize
 #df_a_anonymous <- df_a_anonymous %>% mutate('Entry ID' = sprintf("ENTA_%03d", row_number()))
 
 # Prepare data for combining dataframes
 df_a_anonymous <- df_a_anonymous %>% 
   mutate(Creators = NA) %>% 
   mutate(Description = NA) %>% 
-  select(1:2, Creators, Description, 3:27, `Entry ID`)
+  select(1:2, Creators, Description, 3:28, `Entry ID`)
 names(df_a_anonymous) == names(df_ne_anonymous) # Check if all correct
 
 # Combine data
@@ -61,6 +61,7 @@ google_sheet_url_per <- "https://docs.google.com/spreadsheets/d/1RyAY2lHhLF83lJX
 sheets_per <- sheet_names(google_sheet_url_per)
 df_per <- read_sheet(google_sheet_url_per, sheet = sheets_per)
 # Save Entry ID's for entries with game author permissions
+df_per <- df_per[,1:3]
 permissions <- df_per[df_per$Permission == 'Consent granted',] %>% drop_na()
 permissions <- permissions$`Entry ID`
 
